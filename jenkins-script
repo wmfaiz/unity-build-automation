@@ -1,0 +1,52 @@
+pipeline {
+  agent { label 'local-mac-mini-m4' }
+  parameters {
+    choice(name: 'ENV', choices: ['PRD', 'STG', 'QA', 'DEV'], description: 'Select which environment to sync from Azure')
+  }
+  
+  environment {
+    PYTHON_PATH = "/opt/homebrew/bin/python3.11"
+    SCRIPT_PATH = "/Users/dreamteamadmin/Projects/Externals/PlayFabDataMigration/main.py"
+    DEFAULT_ENV = "PRD"
+  }
+
+  triggers {
+    cron('H */4 * * *')
+  }
+
+  stages {
+    stage('Preparing') {
+      steps {
+        echo "Preparing environment on dt-mac-mini..."
+        sh '''
+          echo "Running as $(whoami) on $(hostname)"
+          which ${PYTHON_PATH} || echo "Python path not found, please verify PATH or PYTHON_PATH"
+        '''
+      }
+    }
+
+    stage('Run PlayFab Data Migration') {
+      steps {
+        echo "Executing PlayFabDataMigration for ${params.ENV}..."
+        sh """
+          $PYTHON_PATH "$SCRIPT_PATH" ${params.ENV ?: DEFAULT_ENV}
+        """
+      }
+    }
+
+    stage('Finished') {
+      steps {
+        echo "Migration completed successfully for ${params.ENV}"
+      }
+    }
+  }
+
+  post {
+    failure {
+      echo "Migration failed — check logs in Jenkins console."
+    }
+    always {
+      echo "Cleaning workspace..."
+    }
+  }
+}
